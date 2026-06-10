@@ -1,0 +1,8 @@
+id,algorithm,training_env,test_env,randomization,mass_range,timesteps,seed,eval_episodes,mean_return,std_return,success_rate,notes
+P2-01,SAC,source,source,none,1.0,500000,0,50,,,,source-source reference
+P2-02,SAC,source,target,none,1.0 train -> 5.0 test,500000,0,50,,,,lower bound
+P2-03,SAC,target,target,none,5.0,500000,0,50,,,,upper bound
+P2-04,SAC,source,target,UDR,"uniform 0.5-8.0",500000,0,50,,,,domain randomization
+P2-05,SAC,source,target,ADR,"adaptive global 0.5-8.0 initial 1.0-2.0",500000,0,50,,,,automatic domain randomization
+P2-06,PPO,source,target,none,1.0 train -> 5.0 test,500000,0,50,,,,optional comparison against SAC
+

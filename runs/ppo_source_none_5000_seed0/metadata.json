@@ -1,0 +1,43 @@
+{
+  "algo": "ppo",
+  "sampling_strategy": "none",
+  "env_type": "source",
+  "reward_type": "dense",
+  "timesteps": 5000,
+  "seed": 0,
+  "output_dir": "runs",
+  "run_name": "ppo_source_none_5000_seed0",
+  "verbose": 0,
+  "verbose_randomization": false,
+  "mass_range": [
+    0.5,
+    8.0
+  ],
+  "adr_initial_range": [
+    1.0,
+    2.0
+  ],
+  "adr_step": 0.25,
+  "adr_boundary_prob": 0.5,
+  "adr_success_threshold": 0.5,
+  "learning_rate": 0.0003,
+  "gamma": 0.95,
+  "batch_size": 256,
+  "n_steps": 2048,
+  "n_epochs": 10,
+  "gae_lambda": 0.95,
+  "clip_range": 0.2,
+  "buffer_size": 500000,
+  "learning_starts": 1000,
+  "tau": 0.005,
+  "train_freq": 1,
+  "gradient_steps": 1,
+  "eval_every": 10000,
+  "eval_episodes": 10,
+  "checkpoint_every": 0,
+  "run_dir": "runs/ppo_source_none_5000_seed0",
+  "final_model": "runs/ppo_source_none_5000_seed0/models/final_model.zip",
+  "best_model": "runs/ppo_source_none_5000_seed0/models/best_model.zip",
+  "source_mass": 1.0,
+  "target_mass": 5.0
+}
