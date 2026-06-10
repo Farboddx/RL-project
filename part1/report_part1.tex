@@ -1,0 +1,62 @@
+\subsection{Part 1: Basic Policy-Gradient Control on Hopper}
+
+In the first part of the project, we trained agents on the MuJoCo Hopper environment using policy-gradient methods implemented from scratch. Hopper is a continuous-control benchmark in which a one-legged robot must move forward without falling. The observation space is continuous; for the standard Gymnasium \texttt{Hopper-v4} environment it is an 11-dimensional \texttt{Box} containing position and velocity information, with the global x-position omitted. The action space is also continuous and consists of three torque commands for the actuated joints. After checking the official course repository, Part 1 uses the standard \texttt{Hopper-v4} environment and does not include separate custom Hopper source/target XML files. The body masses extracted from \texttt{env.unwrapped.model.body\_mass} were: world 0.0000, torso 3.6652, thigh 4.0579, leg 2.7814, and foot 5.3156.
+
+\paragraph{REINFORCE.}
+We implemented a stochastic Gaussian policy $\pi_\theta(a_t \mid s_t)$ with a neural-network mean and learned diagonal standard deviation. Given an episode, the reward-to-go was computed as
+\begin{equation}
+G_t = \sum_{k=t}^{T-1} \gamma^{k-t} r_k .
+\end{equation}
+The vanilla REINFORCE loss minimized in the implementation was
+\begin{equation}
+\mathcal{L}_{\mathrm{PG}}(\theta)
+= - \sum_t \log \pi_\theta(a_t \mid s_t) G_t .
+\end{equation}
+This estimator is unbiased but high-variance, especially in long-horizon continuous-control tasks such as Hopper.
+
+\paragraph{REINFORCE with constant baseline.}
+We also implemented the required constant-baseline variant with $b = 20$:
+\begin{equation}
+\mathcal{L}_{\mathrm{PG+b}}(\theta)
+= - \sum_t \log \pi_\theta(a_t \mid s_t) (G_t - b).
+\end{equation}
+Because the baseline is independent of the sampled action, it does not change the expected policy gradient. Its purpose is variance reduction. A constant baseline is useful only when it is close to the typical return scale; otherwise, a learned state-dependent baseline is preferable.
+
+\paragraph{Actor-Critic.}
+Finally, we implemented an Actor-Critic agent with a Gaussian actor and a value-function critic $V_\phi(s)$. The default version uses a one-step temporal-difference target,
+\begin{equation}
+y_t = r_t + \gamma V_\phi(s_{t+1})(1-d_t),
+\end{equation}
+and advantage estimate
+\begin{equation}
+A_t = y_t - V_\phi(s_t).
+\end{equation}
+The actor and critic objectives are
+\begin{equation}
+\mathcal{L}_{\mathrm{actor}}(\theta)
+= -\mathbb{E}_t[\log \pi_\theta(a_t \mid s_t)\mathrm{stopgrad}(A_t)]
+\end{equation}
+and
+\begin{equation}
+\mathcal{L}_{\mathrm{critic}}(\phi)
+= \mathbb{E}_t[(V_\phi(s_t)-y_t)^2].
+\end{equation}
+Compared with REINFORCE, Actor-Critic is expected to produce smoother learning curves because the critic provides a state-dependent baseline, although its performance depends on the accuracy and stability of the learned value function.
+
+\begin{table}[t]
+\centering
+\caption{Part 1 evaluation on \texttt{Hopper-v4}. Each learned policy was evaluated over 50 deterministic episodes using the best checkpoint from a 1000-episode seed-0 training run.}
+\label{tab:part1_results}
+\begin{tabular}{lrrrr}
+\hline
+Method & Mean Return & Std Return & Mean Length & Time (s) \\
+\hline
+Random policy & 45.629 & 34.135 & 39.000 & 0.000 \\
+REINFORCE & 331.457 & 1.620 & 212.540 & 23.199 \\
+REINFORCE, $b=20$ & 277.596 & 0.839 & 155.560 & 27.928 \\
+Actor-Critic & 228.826 & 1.188 & 100.260 & 32.555 \\
+\hline
+\end{tabular}
+\end{table}
+
+The learned policies all substantially outperformed the random-policy baseline. In this seed-0 run, vanilla REINFORCE achieved the best deterministic evaluation return. The fixed baseline reduced the evaluation variance but did not improve the mean return, likely because the constant value $b=20$ was not well matched to the larger return scale reached later in training. Actor-Critic learned a valid controller, but the default one-step TD critic underperformed the REINFORCE variants, suggesting sensitivity to critic accuracy and learning-rate choices.

@@ -1,0 +1,5 @@
+experiment_id,algorithm,environment,seed,episodes,eval_episodes,baseline,ac_target,mean_return,std_return,mean_length,training_time_sec,checkpoint,notes
+P1-RAND,random,Hopper-v4,0,0,5,,,,45.629,34.135,39.000,0,,Environment sanity check
+P1-REINFORCE,REINFORCE,Hopper-v4,0,1000,50,0,,331.457,1.620,212.540,23.199,best.pt,Vanilla policy gradient
+P1-REINFORCE-B20,REINFORCE + constant baseline,Hopper-v4,0,1000,50,20,,277.596,0.839,155.560,27.928,best.pt,Required b=20 baseline
+P1-AC,Actor-Critic,Hopper-v4,0,1000,50,,td,228.826,1.188,100.260,32.555,best.pt,Actor-Critic with one-step TD target
