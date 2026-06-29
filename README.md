@@ -1,232 +1,199 @@
-# FAIML RL Project - Part 1
+# Reinforcement Learning for Robotic Control: Policy Gradients and Sim-to-Sim Domain Randomisation
 
-This folder completes Part 1 of the project:
+**Group 73 — FAIMDL 2025–2026, Politecnico di Torino**  
+s360234 (Nowrouz) · s359032 (Tahmasebi Far) · s359010 (Golkar Khouzani) · s359417 (Chalish Hafshejani)
 
-- inspect and test the Gym Hopper environment;
-- implement REINFORCE from scratch;
-- implement REINFORCE with the required constant baseline `b = 20`;
-- implement an Actor-Critic policy-gradient agent from scratch;
-- log returns, episode lengths, timing, evaluation scores, and checkpoints;
-- provide report-ready notes for the preliminaries and Part 1 analysis.
+---
 
-The code is intentionally independent from Stable-Baselines3 because Part 1 asks for basic RL algorithms implemented from scratch.
+## Overview
 
-## Environment Setup
+This project investigates reinforcement learning for continuous robotic control and sim-to-sim transfer.
 
-Use Python 3.10 or 3.11 if possible. Some PyTorch and MuJoCo wheels may not be available for newer Python versions.
+- **Part 1** — Three policy-gradient agents (REINFORCE, REINFORCE + baseline, Actor-Critic) implemented from scratch and evaluated on MuJoCo **Hopper-v4**.
+- **Part 2** — SAC-based sim-to-sim transfer pipeline on **PandaPush-v3** with Uniform Domain Randomisation (UDR) and Automatic Domain Randomisation (ADR).
+
+---
+
+## Project Structure
+
+```
+.
+├── part1/
+│   ├── agent.py               # REINFORCE, REINFORCE+baseline, Actor-Critic
+│   ├── train.py               # Training loop (1000 episodes, seed 0)
+│   ├── evaluate.py            # Deterministic evaluation (50 episodes)
+│   ├── env_utils.py           # Environment helpers
+│   └── runs/                  # Saved checkpoints and metrics
+│       ├── reinforce_Hopper-v4_seed0/
+│       ├── reinforce_b20_Hopper-v4_seed0/
+│       └── actor_critic_Hopper-v4_seed0/
+│
+├── part2/
+│   ├── train_sb3.py           # SAC/PPO training via Stable-Baselines3
+│   ├── eval_sb3.py            # Evaluation (50 deterministic episodes → JSON/CSV)
+│   ├── rand_wrapper.py        # UDR and ADR gym wrappers
+│   ├── run_part2_matrix.sh    # Reproduce all 7 transfer conditions
+│   ├── panda_gym_modified/    # Modified panda-gym (adds source/target mass param)
+│   │   └── panda_gym/envs/
+│   │       ├── panda_tasks.py
+│   │       └── tasks/push.py
+│   └── runs/                  # Evaluation results and trained models
+│       ├── eval_sac_*.json          (7 result files)
+│       └── sac_*_1000000_seed0/
+│           └── models/best_model.zip
+│
+└── README.md
+```
+
+---
+
+## Part 1 — Policy Gradients on Hopper-v4
+
+### Environment
+
+- **Task:** MuJoCo Hopper-v4 — move a one-legged robot forward without falling
+- **Observation:** 11-dimensional continuous Box (positions + velocities)
+- **Action:** 3-dimensional continuous Box, clipped to [−1, 1]
+
+### Algorithms
+
+| Method | Description |
+|--------|-------------|
+| REINFORCE | Monte-Carlo policy gradient with reward-to-go |
+| REINFORCE + b=20 | Constant baseline b=20 subtracted to reduce variance |
+| Actor-Critic | Stochastic actor + one-step TD value critic |
+
+### Results (seed 0, best checkpoint, 50 deterministic episodes)
+
+| Method | Mean Return | Std Return | Mean Length | Time (s) |
+|--------|-------------|------------|-------------|----------|
+| Random | 45.6 | 34.1 | 39.0 | 0.0 |
+| REINFORCE | **331.5** | 1.6 | 212.5 | 23.2 |
+| REINFORCE b=20 | 277.6 | 0.8 | 155.6 | 27.9 |
+| Actor-Critic | 228.8 | 1.2 | 100.3 | 32.6 |
+
+### Setup & Run
 
 ```bash
-python3.11 -m venv .venv
+cd part1
+pip install gymnasium[mujoco] torch numpy
+
+# Train
+python train.py --algo reinforce      --seed 0
+python train.py --algo reinforce_b    --seed 0
+python train.py --algo actor_critic   --seed 0
+
+# Evaluate
+python evaluate.py --algo reinforce \
+    --checkpoint runs/reinforce_Hopper-v4_seed0/best.pt
+```
+
+---
+
+## Part 2 — Sim-to-Sim Transfer on PandaPush-v3
+
+### Transfer Setting
+
+| Domain | Cube Mass |
+|--------|-----------|
+| Source | 1 kg |
+| Target | 5 kg |
+
+A policy trained only in the **source** domain and evaluated on the **target** constitutes the lower bound. Training directly on the target domain is the upper bound.
+
+### Randomisation Strategies
+
+| Strategy | Description |
+|----------|-------------|
+| **None** | Fixed cube mass during training |
+| **UDR** | Mass sampled uniformly from [0.5, 8.0] kg at each episode reset |
+| **ADR** | Range starts at [1.0, 2.0] kg; expands/contracts by δ=0.25 kg based on success; global limits [0.5, 8.0] kg |
+
+### Results (SAC, 1 000 000 timesteps, seed 0, 50 deterministic episodes)
+
+| Train → Test | Randomisation | Mean Return | Std Return | Success |
+|-------------|---------------|-------------|------------|---------|
+| source → source | none | −0.40 | 0.25 | **100%** |
+| source → target | none | −0.51 | 0.39 | **100%** |
+| target → target | none | −0.38 | 0.23 | **100%** |
+| source → source | UDR | −0.39 | 0.25 | **100%** |
+| source → target | UDR | −0.43 | 0.27 | **100%** |
+| source → source | ADR | −0.41 | 0.25 | **100%** |
+| source → target | ADR | −0.45 | 0.28 | **100%** |
+
+SAC achieves **100% success across all seven conditions** at 1 000 000 timesteps. The differences are in mean return (pushing efficiency): UDR largely closes the source→target gap (−0.43 vs −0.40 on source), while ADR produces a slightly more cautious policy (−0.45) due to its gradual curriculum expansion.
+
+### Setup
+
+**Requirements:** Python 3.12
+
+```bash
+cd part2
+
+# Create virtual environment
+python3.12 -m venv .venv
 source .venv/bin/activate
-pip install --upgrade pip
-pip install -r part1/requirements.txt
+
+# Install dependencies
+pip install stable-baselines3 gymnasium torch numpy
+
+# Install modified panda-gym (source/target mass parameter)
+pip install -e panda_gym_modified/
 ```
 
-If your machine only has `python3`, replace `python3.11` with `python3`.
-
-## Inspect Hopper
-
-Use this command to answer the environment questions:
+### Run
 
 ```bash
-python part1/inspect_env.py --source-env-id Hopper-v4 --target-env-id Hopper-v4
+# Train and evaluate all 7 conditions in parallel (~2.5 hours on Apple M1)
+bash run_part2_matrix.sh
+
+# Train a single condition manually
+python train_sb3.py \
+    --algo sac \
+    --sampling-strategy none \
+    --env-type source \
+    --timesteps 1000000 \
+    --seed 0 \
+    --run-name sac_source_none_1000000_seed0
+
+# Evaluate a trained model
+python eval_sb3.py \
+    --model-path runs/sac_source_none_1000000_seed0/models/best_model.zip \
+    --algo sac \
+    --env-type target \
+    --episodes 50 \
+    --output-json runs/eval_sac_source_to_target.json \
+    --output-csv  runs/eval_sac_source_to_target.csv
 ```
 
-If the course repository provides custom source and target Hopper environments, replace the two IDs:
+### SAC Hyperparameters
 
-```bash
-python part1/inspect_env.py --source-env-id <SOURCE_HOPPER_ID> --target-env-id <TARGET_HOPPER_ID>
-```
+| Parameter | Value |
+|-----------|-------|
+| Learning rate | 3 × 10⁻⁴ |
+| Discount γ | 0.95 |
+| Batch size | 256 |
+| Replay buffer | 500 000 |
+| Learning starts | 1 000 |
+| τ (soft update) | 0.005 |
 
-The script prints:
+---
 
-- observation/state space;
-- action space;
-- MuJoCo body names;
-- body masses;
-- number of velocity DoFs;
-- number of actuators.
+## Dependencies
 
-## Random Policy Sanity Check
+| Package | Version |
+|---------|---------|
+| Python | 3.12 |
+| PyTorch | ≥ 2.0 |
+| Stable-Baselines3 | ≥ 2.0 |
+| Gymnasium | ≥ 0.29 |
+| MuJoCo | ≥ 2.3 |
+| panda-gym | bundled (modified) |
+| NumPy | ≥ 1.24 |
 
-```bash
-python part1/test_random_policy.py --env-id Hopper-v4 --episodes 5
-```
+---
 
-This should produce low returns and frequent falls. It is useful only to confirm that the environment can reset, step, and terminate correctly.
+## Course
 
-## Train REINFORCE
-
-```bash
-python part1/train.py \
-  --algo reinforce \
-  --env-id Hopper-v4 \
-  --episodes 1000 \
-  --seed 0
-```
-
-## Train REINFORCE with Constant Baseline
-
-```bash
-python part1/train.py \
-  --algo reinforce_baseline \
-  --baseline 20 \
-  --env-id Hopper-v4 \
-  --episodes 1000 \
-  --seed 0
-```
-
-## Train Actor-Critic
-
-```bash
-python part1/train.py \
-  --algo actor_critic \
-  --env-id Hopper-v4 \
-  --episodes 1000 \
-  --seed 0
-```
-
-For a more sample-efficient Actor-Critic variant, try Monte-Carlo returns as the critic target:
-
-```bash
-python part1/train.py \
-  --algo actor_critic \
-  --ac-target mc \
-  --env-id Hopper-v4 \
-  --episodes 1000 \
-  --seed 0
-```
-
-## Run the Full Part 1 Pipeline
-
-After installing dependencies, this command runs environment inspection, random policy testing, all three training jobs, 50-episode evaluation, and the final comparison plot:
-
-```bash
-bash part1/run_all_part1.sh Hopper-v4 1000 0
-```
-
-## Evaluate a Checkpoint
-
-```bash
-python part1/evaluate.py \
-  --run-dir part1/runs/<RUN_NAME> \
-  --checkpoint best.pt \
-  --episodes 50
-```
-
-## Plot Training Curves
-
-```bash
-python part1/plot_results.py \
-  --inputs \
-  reinforce=part1/runs/<REINFORCE_RUN>/metrics.csv \
-  reinforce_b20=part1/runs/<REINFORCE_BASELINE_RUN>/metrics.csv \
-  actor_critic=part1/runs/<ACTOR_CRITIC_RUN>/metrics.csv \
-  --output part1/runs/part1_training_curves.png
-```
-
-## Expected Report Comparison
-
-Report these metrics for each algorithm:
-
-- final average training return;
-- average return over 50 deterministic evaluation episodes;
-- episode length;
-- wall-clock training time;
-- stability of the learning curve.
-
-The usual qualitative expectation is:
-
-- random policy performs poorly;
-- REINFORCE without baseline has high variance and unstable learning;
-- REINFORCE with `b = 20` can reduce variance when the baseline is close to typical returns, but a fixed baseline is not always optimal;
-- Actor-Critic is usually more stable because the critic provides a state-dependent baseline, although it introduces value-function approximation error.
-# FAIML RL Project - Part 2
-
-This folder completes the Part 2 template:
-
-- PPO and SAC training with Stable-Baselines3.
-- Source/target baseline evaluation.
-- Uniform Domain Randomization.
-- Adaptive Domain Randomization.
-- Report-ready notes and experiment tracker.
-
-## Setup
-
-From the repository root:
-
-```bash
-python3.11 -m venv .venv-part2
-source .venv-part2/bin/activate
-python -m pip install --upgrade pip
-python -m pip install -r part2/requirements_part2.txt
-cd part2/panda-gym
-python -m pip install -e .
-cd ..
-```
-
-Use Python 3.10 or 3.11. Python 3.13 is not recommended for Part 2 because `pybullet` may fail to build and the bundled `panda-gym` requires `numpy<2`.
-
-## Inspect Source and Target
-
-From `part2`:
-
-```bash
-python inspect_push_env.py
-```
-
-Expected cube masses:
-
-- source: `1 kg`
-- target: `5 kg`
-
-## Train PPO and SAC
-
-```bash
-python train_sb3.py --algo ppo --env-type source --sampling-strategy none --timesteps 500000
-python train_sb3.py --algo sac --env-type source --sampling-strategy none --timesteps 500000
-```
-
-The model is saved under:
-
-```text
-runs/<run-name>/models/
-```
-
-## Run the Full Part 2 Matrix
-
-This trains source, target, UDR, and ADR models with SAC by default and evaluates the required configurations, including UDR/ADR on both source and target:
-
-```bash
-bash run_part2_matrix.sh 500000 0 sac
-```
-
-For quick sanity testing only:
-
-```bash
-bash run_part2_matrix.sh 5000 0 sac
-```
-
-## Evaluate a Model
-
-```bash
-python eval_sb3.py --algo sac --model-path runs/<run-name>/models/best_model.zip --env-type target --episodes 50
-```
-
-## Plot Training Curves
-
-After training, generate report-ready PNG plots from TensorBoard logs:
-
-```bash
-python plot_training_curves_part2.py
-```
-
-## Important Output Files
-
-- `train_sb3.py`: PPO/SAC training.
-- `eval_sb3.py`: 50-episode evaluation.
-- `rand_wrapper.py`: UDR/ADR mass randomization.
-- `inspect_push_env.py`: confirms source/target masses.
-- `plot_training_curves_part2.py`: creates training plots for PPO/SAC runs.
-- `experiment_tracker_part2.csv`: table to fill with final results.
-- `report_part2.md`: text for the report.
+FAIMDL — Foundations of AI and Machine Deep Learning, 2025–2026  
+Politecnico di Torino

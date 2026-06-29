@@ -1,0 +1,15 @@
+{
+  "model_path": "runs/sac_source_none_1000000_seed0/models/best_model.zip",
+  "algo": "sac",
+  "env_type": "target",
+  "reward_type": "dense",
+  "episodes": 50,
+  "deterministic": true,
+  "seed": 123,
+  "mean_return": -0.5138848423957825,
+  "std_return": 0.3906508684158325,
+  "min_return": -1.600126028060913,
+  "max_return": -0.017179999500513077,
+  "mean_length": 6.5,
+  "success_rate": 1.0
+}
